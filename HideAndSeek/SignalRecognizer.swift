@@ -59,8 +59,8 @@ final class SignalRecognizer {
     }
     
     private func analyzeSamples(leftSamples: [Float], rightSamples: [Float]) {
-        let normLeftSamples = leftSamples.map { $0 * 1000 }
-        let normRightSamples = rightSamples.map { $0 * 1000 }
+        let normLeftSamples = leftSamples.map { $0 }
+        let normRightSamples = rightSamples.map { $0 }
         
         let leftCorr = xcorr(normLeftSamples, patternSamples)
         let rightCorr = xcorr(normRightSamples, patternSamples)

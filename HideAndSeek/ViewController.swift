@@ -6,61 +6,28 @@
 //
 
 import UIKit
-import CoreBluetooth
-import AVFoundation
-import Accelerate
 
-final class ViewController: UIViewController {
-    
-    @IBOutlet var textView: UITextView!
-    //    private let recorder = AudioRecorder()
-    private let player = AudioPlayer()
-    private let signalRecognizer = SignalRecognizer()
+final class ViewController: UINavigationController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        overrideUserInterfaceStyle = .light
         
-        textView.text = ""
-        
-        let waveSamples = extractSamplesFromWavFile(
-            fileData: try! Data(contentsOf: Bundle.main.url(forResource: "mainPattern", withExtension: "wav")!)
-        )
-        
-        signalRecognizer.startRecognizer(pattern: waveSamples)
-        signalRecognizer.delegate = self
-    }
-    
-    private func generateWave(frequency: Float, samplesCount: Int, sampleRate: Float = 48000) -> [Float] {
-        var result: [Float] = []
-        
-        for i in 0..<samplesCount {
-            result.append(sin(frequency * 2 * Float.pi * Float(i) / Float(sampleRate)))
-        }
-        
-        return result
-    }
-    
-    private func extractSamplesFromWavFile(fileData: Data) -> [Float] {
-        let samplesCount = (fileData.count - 500) / 2
-        
-        let fileData = Array(fileData.dropFirst(500))
-        
-        var result: [Float] = []
-        
-        for i in 0..<samplesCount {
-            let ampUInt = UInt(fileData[i * 2]) + UInt(fileData[i * 2 + 1]) * 256
-            let ampInt = Int16(bitPattern: UInt16(ampUInt))
-            
-            result.append(Float(ampInt) / 32768)
-        }
-        
-        return result
+        let viewController = ModeSelectionViewController()
+        viewController.delegate = self
+        pushViewController(viewController, animated: false)
     }
 }
 
-extension ViewController: SignalRecognizerDelegate {
-    func delayMeasured(delay: Int) {
-        textView.text += "Measured delay = \(delay)\n"
-        textView.scrollRangeToVisible(.init(location: textView.text.count - 1, length: 1))
+extension ViewController: ModeSelectionViewControllerDelegate {
+    func didSelectedMode(mode: AppMode) {
+        switch mode {
+        case .searcher:
+            let viewController = SearcherViewController()
+            pushViewController(viewController, animated: true)
+        case .hider:
+            let viewController = HiderViewController()
+            pushViewController(viewController, animated: true)
+        }
     }
 }
