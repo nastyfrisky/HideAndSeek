@@ -23,8 +23,6 @@ final class SignalRecognizer {
     private var leftChannelSamples: [Float] = []
     private var rightChannelSamples: [Float] = []
     
-    private var detectionsDifference: [Int] = []
-    
     func startRecognizer(pattern: [Float]) {
         guard !isStarted else { return }
         patternSamples = normalizedSignal(signal: pattern)
@@ -49,60 +47,46 @@ final class SignalRecognizer {
             rightChannelSamples.append(buffer.floatChannelData!.pointee[Int(i + buffer.frameLength)])
         }
         
-        let doublePatternCount = patternSamples.count * 2
+        let patternCount = patternSamples.count
+        let doublePatternCount = patternCount * 2
         while leftChannelSamples.count >= doublePatternCount {
             let leftSamples = Array(leftChannelSamples.prefix(doublePatternCount))
             let rightSamples = Array(rightChannelSamples.prefix(doublePatternCount))
-            leftChannelSamples = Array(leftChannelSamples.dropFirst(patternSamples.count))
-            rightChannelSamples = Array(rightChannelSamples.dropFirst(patternSamples.count))
+            leftChannelSamples = Array(leftChannelSamples.dropFirst(patternCount))
+            rightChannelSamples = Array(rightChannelSamples.dropFirst(patternCount))
             analyzeSamples(leftSamples: leftSamples, rightSamples: rightSamples)
         }
     }
     
     private func analyzeSamples(leftSamples: [Float], rightSamples: [Float]) {
-        let normLeftSamples = normalizedSignal(signal: leftSamples)
-        let normRightSamples = normalizedSignal(signal: rightSamples)
+        let normLeftSamples = leftSamples.map { $0 * 1000 }
+        let normRightSamples = rightSamples.map { $0 * 1000 }
         
         let leftCorr = xcorr(normLeftSamples, patternSamples)
         let rightCorr = xcorr(normRightSamples, patternSamples)
         
-        let leftIndex = maxAbsValueIndex(signal: leftCorr)
-        let rightIndex = maxAbsValueIndex(signal: rightCorr)
+        let pickCount = 20
+        let sortedLeftCorr = zip(leftCorr, (0..<leftCorr.count)).sorted { $0.0 < $1.0 }.suffix(pickCount)
+        let sortedRightCorr = zip(rightCorr, (0..<rightCorr.count)).sorted { $0.0 < $1.0 }.suffix(pickCount)
         
-        detectionsDifference.append(leftIndex - rightIndex)
+        var pairs: [(Int, Int)] = []
         
-        if detectionsDifference.count == 100 {
-            
-            print("L_CH")
-            var i = 0
-            normLeftSamples.forEach {
-                if !$0.isNaN {
-                    print("(\(i);\($0))")
+        sortedLeftCorr.forEach { leftCorrElement in
+            sortedRightCorr.forEach { rightCorrElement in
+                if abs(leftCorrElement.1 - rightCorrElement.1) <= 22 {
+                    pairs.append((leftCorrElement.1, rightCorrElement.1))
                 }
-                
-                i += 1
             }
-            
-            print("")
-            print("R_CH")
-            i = 0
-            normRightSamples.forEach {
-                if !$0.isNaN {
-                    print("(\(i);\($0))")
-                }
-                
-                i += 1
+        }
+        
+        let sortedPairs = pairs.sorted { a, b in
+            abs(leftCorr[a.0] * rightCorr[a.1]) > abs(leftCorr[b.0] * rightCorr[b.1])
+        }
+        
+        if let pair = sortedPairs.first {
+            DispatchQueue.main.async {
+                self.delegate?.delayMeasured(delay: pair.0 - pair.1)
             }
-            
-            fatalError()
-            
-            let common = common(values: detectionsDifference)
-
-            DispatchQueue.main.async { [weak self] in
-                self?.delegate?.delayMeasured(delay: common)
-            }
-
-            detectionsDifference.removeAll(keepingCapacity: true)
         }
     }
     
@@ -125,7 +109,7 @@ final class SignalRecognizer {
     
     private func normalizedSignal(signal: [Float]) -> [Float] {
         let max = signal.map { abs($0) }.max()!
-        return signal.map { $0 / max }
+        return signal.map { $0 / max * 1000 }
     }
     
     private func middleAbsValue(signal: [Float]) -> Float {
@@ -170,4 +154,35 @@ final class SignalRecognizer {
         
         return number
     }
+    
+    private func makeCorrelationFunction(signal: [Float], pattern: [Float]) -> [Float] {
+        var result: [Float] = []
+        
+        let functionLength = signal.count + pattern.count - 1
+        
+        for i in 0..<functionLength {
+            result.append(correlationPoint(
+                signal: signal,
+                pattern: pattern,
+                patternStart: i - pattern.count + 1
+            ))
+        }
+        
+        return result
+    }
+    
+    private func correlationPoint(signal: [Float], pattern: [Float], patternStart: Int) -> Float {
+        var result: Double = 0
+        
+        let patternEnd = patternStart + pattern.count - 1
+        let regionStart = max(0, patternStart)
+        let regionEnd = min(signal.count - 1, patternEnd)
+        
+        for i in regionStart...regionEnd {
+            result += Double(signal[i]) * Double(pattern[i - patternStart])
+        }
+        
+        return Float(result)
+    }
+
 }

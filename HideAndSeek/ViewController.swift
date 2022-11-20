@@ -12,14 +12,15 @@ import Accelerate
 
 final class ViewController: UIViewController {
     
-    @IBOutlet var label: UILabel!
-    
-//    private let recorder = AudioRecorder()
+    @IBOutlet var textView: UITextView!
+    //    private let recorder = AudioRecorder()
     private let player = AudioPlayer()
     private let signalRecognizer = SignalRecognizer()
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        textView.text = ""
         
         let waveSamples = extractSamplesFromWavFile(
             fileData: try! Data(contentsOf: Bundle.main.url(forResource: "mainPattern", withExtension: "wav")!)
@@ -59,6 +60,7 @@ final class ViewController: UIViewController {
 
 extension ViewController: SignalRecognizerDelegate {
     func delayMeasured(delay: Int) {
-        label.text = "\(delay)"
+        textView.text += "Measured delay = \(delay)\n"
+        textView.scrollRangeToVisible(.init(location: textView.text.count - 1, length: 1))
     }
 }
