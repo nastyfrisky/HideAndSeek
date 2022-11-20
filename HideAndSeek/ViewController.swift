@@ -22,36 +22,27 @@ final class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let fileData = try! Data(contentsOf: Bundle.main.url(forResource: "pattern2", withExtension: "wav")!)
-        let birdSound = extractSamplesFromWavFile(fileData: fileData)
-        
-        var currentBuffer: [Float] = []
-        var capturedPicks: [Float] = []
+        var counter = 0
         
         recorder.startRecord { [weak self] buffer in
-            for i in 0..<buffer.frameLength {
-                currentBuffer.append(buffer.floatChannelData!.pointee[Int(i)])
+            counter += 1
+            guard counter >= 3 else { return }
+            
+            self?.recorder.stopRecord()
+            
+            print("frames count = \(buffer.frameLength)")
+            
+            print("CH1")
+            for i in 0..<220 {
+                print("\(buffer.floatChannelData!.pointee[i]),")
             }
             
-            guard let self = self else { return }
-            let pattern = birdSound
-            
-            guard currentBuffer.count > pattern.count * 2 else { return }
-            
-            let correlationFunction = self.xcorr(self.normalizedSignal(signal: currentBuffer), pattern)
-
-            currentBuffer = Array(currentBuffer.dropFirst(currentBuffer.count / pattern.count * pattern.count))
-            
-            let power = round(correlationFunction.max()! * 100) / 100
-
-            capturedPicks.append(power)
-            if capturedPicks.count > 10 { capturedPicks = Array(capturedPicks.dropFirst()) }
-            
-            let middlePower = capturedPicks.reduce(0, +) / 10
-            
-            DispatchQueue.main.async {
-                self.label.text = "\(power)"
+            print("")
+            print("CH2")
+            for i in 0..<220 {
+                print("\(buffer.floatChannelData!.pointee[Int(buffer.frameLength) + i]),")
             }
+            
         }
     }
     
